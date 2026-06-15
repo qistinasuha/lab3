@@ -1,56 +1,61 @@
 """
-data_loader.py
---------------
-Loads and preprocesses the Titanic dataset from Seaborn.
-Returns a clean DataFrame ready for all visualizations.
+TFB3133 / TEB3133 Data Visualization — Lab 3
+High-Dimensional Data Visualization Techniques
+Dataset: Titanic (loaded directly from Seaborn — no CSV needed)
 """
 
-import pandas as pd
+import altair as alt
+import plotly.express as px
 import seaborn as sns
 import streamlit as st
-import plotly.express as px
-import altair as alt
 
+# ── Page config ───────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Lab 3 — High-Dimensional Data Visualization",
+    page_icon="📊",
+    layout="wide",
+)
 
-COLUMNS = ["survived", "pclass", "sex", "age", "fare", "embarked", "who", "alone"]
-
-
-@st.cache_data(show_spinner="Loading Titanic dataset...")
-def load_titanic() -> pd.DataFrame:
-    """
-    Load the Titanic dataset from Seaborn, select relevant columns,
-    drop rows with any missing values, and add human-readable label columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        Clean DataFrame with added 'survived_label' and 'pclass_label' columns.
-    """
+# ── Load & cache dataset ──────────────────────────────────────────────────────
+@st.cache_data
+def load_data():
     df = sns.load_dataset("titanic")
-    df = df[COLUMNS].dropna().reset_index(drop=True)
-
-    # Human-readable labels used by several visualizations
+    df = df[["survived", "pclass", "sex", "age", "fare",
+             "embarked", "who", "alone"]].dropna().reset_index(drop=True)
     df["survived_label"] = df["survived"].map({0: "Did Not Survive", 1: "Survived"})
-    df["pclass_label"] = df["pclass"].map({1: "1st", 2: "2nd", 3: "3rd"})
-
+    df["pclass_label"]   = df["pclass"].map({1: "1st", 2: "2nd", 3: "3rd"})
     return df
-"""
-visualizations/mosaic.py
-------------------------
-2.1 Mosaic Plot (Marimekko)
 
-Purpose: Visualize the proportional relationship between two categorical
-variables (Passenger Class and Survival Status) using a normalized stacked
-bar chart. Each bar's height represents the proportion of total fare
-contributed by survivors vs. non-survivors within that class.
-"""
+df = load_data()
 
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+st.sidebar.title("📊 Navigation")
+st.sidebar.markdown("**Dataset:** Titanic (Seaborn)")
+st.sidebar.markdown(f"**Rows:** {len(df)}  |  **Columns:** {df.shape[1]}")
+st.sidebar.divider()
 
-def render(df):
+section = st.sidebar.selectbox(
+    "Choose a visualization",
+    [
+        "2.1 Mosaic Plot",
+        "2.2 Trellis Display",
+        "2.3 Heatmap",
+        "2.4 Multivariate Scatter Plot",
+        "2.5 Parallel Coordinate Plot",
+        "2.6 Grand Tour (3D Scatter)",
+        "2.7 Sunburst Chart (Extra)",
+    ],
+)
+
+st.title("High-Dimensional Data Visualization")
+st.caption("TFB3133 / TEB3133 — Week 5 Lab 3 | Dataset: Titanic")
+st.divider()
+
+# ── 2.1 Mosaic Plot ───────────────────────────────────────────────────────────
+if section == "2.1 Mosaic Plot":
     st.header("2.1 Mosaic Plot (Marimekko)")
     st.write("Shows fare distribution grouped by Passenger Class and Survival Status.")
 
-    # Aggregate: sum of fare per class × survival combination
     mosaic_data = (
         df.groupby(["pclass_label", "survived_label"])["fare"]
         .sum()
@@ -92,24 +97,14 @@ def render(df):
         "non-survivors within each passenger class."
     )
     st.info(
-        "💡 **Insight:** In 1st class, survivors contributed a noticeably higher "
-        "proportion of fare, reflecting the higher survival rate of wealthier passengers. "
+        "💡 **Insight:** In 1st class, survivors contributed a noticeably higher proportion "
+        "of fare, reflecting higher survival rates among wealthier passengers. "
         "3rd class shows the opposite — non-survivors dominate."
     )
     st.caption("Task: Which passenger class shows the highest proportion of survivors?")
 
-"""
-visualizations/trellis.py
--------------------------
-2.2 Trellis Display
-
-Purpose: Compare the same scatter plot (Age vs Fare) across multiple
-subgroups (Passenger Class) using small multiples. Each panel uses the
-same axis scale, making cross-group comparison accurate and direct.
-"""
-
-
-def render(df):
+# ── 2.2 Trellis Display ───────────────────────────────────────────────────────
+elif section == "2.2 Trellis Display":
     st.header("2.2 Trellis Display")
     st.write("Scatter plots of Age vs Fare, one panel per Passenger Class.")
 
@@ -143,29 +138,16 @@ def render(df):
         "Notice how fare variance increases dramatically in 1st class."
     )
     st.info(
-        "💡 **Insight:** 1st class has the widest fare spread — older, wealthier passengers "
-        "paid very high fares. 3rd class fares cluster tightly near zero regardless of age."
+        "💡 **Insight:** 1st class has the widest fare spread — passengers paid very high fares "
+        "regardless of age. 3rd class fares cluster tightly near zero for all ages."
     )
-    st.caption(
-        "Task: Which class shows the strongest positive relationship between age and fare?"
-    )
+    st.caption("Task: Which class shows the strongest positive relationship between age and fare?")
 
-"""
-visualizations/heatmap.py
--------------------------
-2.3 Heatmap
-
-Purpose: Represent the average fare as colour intensity across a grid of
-Passenger Class (x) × Gender (y) cells. Darker blue cells indicate higher
-average fares, making patterns visible at a glance.
-"""
-
-
-def render(df):
+# ── 2.3 Heatmap ───────────────────────────────────────────────────────────────
+elif section == "2.3 Heatmap":
     st.header("2.3 Heatmap")
     st.write("Average fare for each Passenger Class and Gender combination.")
 
-    # Aggregate: mean fare per class × gender
     heat_data = (
         df.groupby(["pclass_label", "sex"])["fare"]
         .mean()
@@ -191,8 +173,8 @@ def render(df):
             ),
             tooltip=[
                 alt.Tooltip("pclass_label:N", title="Class"),
-                alt.Tooltip("sex:N", title="Gender"),
-                alt.Tooltip("avg_fare:Q", title="Avg Fare (£)", format=".2f"),
+                alt.Tooltip("sex:N",          title="Gender"),
+                alt.Tooltip("avg_fare:Q",     title="Avg Fare (£)", format=".2f"),
             ],
         )
         .properties(
@@ -216,21 +198,8 @@ def render(df):
         "Does gender always correlate with fare differences?"
     )
 
-"""
-visualizations/scatter.py
--------------------------
-2.4 Multivariate Scatter Plot
-
-Purpose: Encode five variables simultaneously in a single 2D chart using
-position (x=age, y=fare), colour (survival), shape (gender), and point
-size (passenger class). Reveals multi-attribute patterns at a glance.
-"""
-
-import altair as alt
-import streamlit as st
-
-
-def render(df):
+# ── 2.4 Multivariate Scatter Plot ─────────────────────────────────────────────
+elif section == "2.4 Multivariate Scatter Plot":
     st.header("2.4 Multivariate Scatter Plot")
     st.write(
         "Relationships between age, fare, pclass, sex, and survival "
@@ -262,39 +231,28 @@ def render(df):
         .properties(
             width=650,
             height=420,
-            title="Multivariate Scatter: Age vs Fare "
-                  "(color=Survival, shape=Gender, size=Class)",
+            title="Multivariate Scatter: Age vs Fare (color=Survival, shape=Gender, size=Class)",
         )
         .interactive()
     )
 
     st.altair_chart(chart, use_container_width=True)
     st.write(
-        "Each point encodes 5 variables: x position (age), y position (fare), "
-        "color (survival), shape (gender), and size (passenger class). "
-        "Hover over points for full details. Scroll to zoom, click and drag to pan."
+        "Each point encodes 5 variables: x (age), y (fare), color (survival), "
+        "shape (gender), and size (passenger class). "
+        "Hover over points for details. Scroll to zoom, drag to pan."
     )
     st.info(
-        "💡 **Insight:** High-fare survivors (red) cluster among younger-to-middle-aged "
-        "female passengers (circles) with small point sizes (1st class), confirming the "
-        "'women and children first' evacuation pattern."
+        "💡 **Insight:** High-fare survivors (red) cluster among female passengers (circles) "
+        "with small point sizes (1st class), confirming the 'women and children first' pattern."
     )
     st.caption(
         "Task: Do female survivors tend to be younger or older? "
         "Do larger points (3rd class) survive more or less often?"
     )
-"""
-visualizations/parallel.py
---------------------------
-2.5 Parallel Coordinate Plot
 
-Purpose: Draw each passenger record as a line crossing four vertical axes
-(age, fare, pclass, survived). Line colour encodes survival status.
-Clusters of lines reveal shared patterns; crossing lines indicate inverse
-relationships. Supports interactive brushing (drag on any axis to filter).
-"""
-
-def render(df):
+# ── 2.5 Parallel Coordinate Plot ──────────────────────────────────────────────
+elif section == "2.5 Parallel Coordinate Plot":
     st.header("2.5 Parallel Coordinate Plot")
     st.write(
         "Each line represents one passenger record traced across "
@@ -307,9 +265,9 @@ def render(df):
         color="survived",
         color_continuous_scale=px.colors.diverging.RdYlGn,
         labels={
-            "age": "Age",
-            "fare": "Fare (£)",
-            "pclass": "Passenger Class",
+            "age":      "Age",
+            "fare":     "Fare (£)",
+            "pclass":   "Passenger Class",
             "survived": "Survived (0=No, 1=Yes)",
         },
         title="Parallel Coordinate Plot: Age, Fare, Class, and Survival",
@@ -325,7 +283,6 @@ def render(df):
     st.plotly_chart(fig, use_container_width=True)
     st.write(
         "Green lines are survivors; red lines did not survive. "
-        "Lines cluster together when records share similar patterns. "
         "**Drag on any axis** to filter and highlight subsets of data."
     )
     st.info(
@@ -334,26 +291,12 @@ def render(df):
         "with low fares. Age alone is a weaker predictor of survival."
     )
     st.caption(
-        "Task: Drag the tip axis to select only fares above £50. "
-        "Which passenger class is most common for high-fare passengers?"
+        "Task: Drag the fare axis to select fares above £50. "
+        "Which passenger class is most common among high-fare passengers?"
     )
 
-"""
-visualizations/grand_tour.py
------------------------------
-2.6 Grand Tour (3D Scatter Plot)
-
-Purpose: Add a third spatial dimension (z=pclass) to reveal structure
-hidden in 2D views. Users can rotate, zoom, and pan the interactive chart
-to explore the point cloud from multiple angles and discover clusters or
-outliers not visible from a single viewpoint.
-"""
-
-import plotly.express as px
-import streamlit as st
-
-
-def render(df):
+# ── 2.6 Grand Tour (3D Scatter) ───────────────────────────────────────────────
+elif section == "2.6 Grand Tour (3D Scatter)":
     st.header("2.6 Grand Tour: 3D Scatter Plot")
     st.write(
         "Explore age, fare, and pclass in a rotatable 3D space. "
@@ -386,34 +329,20 @@ def render(df):
     st.plotly_chart(fig, use_container_width=True)
     st.write(
         "Rotate the chart by clicking and dragging. Zoom with the scroll wheel. "
-        "Color represents survival status, shape represents gender, "
-        "and point size represents fare amount."
+        "Color = survival status, shape = gender, point size = fare amount."
     )
     st.info(
-        "💡 **Insight:** Rotating to view the Fare–Class plane clearly separates survivors "
+        "💡 **Insight:** Rotating to the Fare–Class plane clearly separates survivors "
         "(teal) at high fare / pclass=1 from non-survivors (orange) at low fare / pclass=3. "
         "Several high-fare outliers in 1st class appear as large isolated points."
     )
     st.caption(
-        "Task: Rotate the chart to find the angle that best separates the survival groups. "
+        "Task: Rotate to find the angle that best separates survival groups. "
         "Can you identify any high-fare outliers in 3rd class?"
     )
 
-"""
-visualizations/sunburst.py
---------------------------
-2.7 Sunburst Chart  (Additional / Extra Visualization)
-
-Purpose: Display a three-level hierarchy — Passenger Class → Gender →
-Survival Status — where each sector's size is proportional to total fare.
-Supports interactive drill-down by clicking any sector to zoom in.
-
-Why chosen: Complements the Mosaic plot by adding a third categorical level
-and enabling hierarchical exploration not possible in a flat bar chart.
-"""
-
-
-def render(df):
+# ── 2.7 Sunburst Chart (Extra) ────────────────────────────────────────────────
+elif section == "2.7 Sunburst Chart (Extra)":
     st.header("2.7 Sunburst Chart (Additional Visualization)")
     st.write(
         "Hierarchical breakdown of total fare by "
@@ -432,17 +361,13 @@ def render(df):
 
     st.plotly_chart(fig, use_container_width=True)
     st.write(
-        "Each ring level represents one level of the hierarchy: "
-        "class (inner) → gender (middle) → survival (outer). "
-        "Sector size is proportional to total fare paid. "
-        "**Click any sector** to zoom into that sub-group."
+        "Each ring = one hierarchy level: class (inner) → gender → survival (outer). "
+        "Sector size = total fare paid. **Click any sector** to zoom into that sub-group."
     )
     st.info(
-        "💡 **Insight:** Female survivors in 1st class dominate their sector's fare total, "
-        "reflecting both higher ticket prices and higher survival rates. "
+        "💡 **Insight:** Female survivors in 1st class dominate their sector's fare total. "
         "In 3rd class, non-survivors of both genders account for the majority of fare."
     )
     st.caption(
         "Task: Click into '3rd' class. Which gender has a higher proportion of survivors?"
     )
-    
